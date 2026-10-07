@@ -1,0 +1,49 @@
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        default: runner
+        type: string
+permissions: write-all
+
+
+env:
+  GT: ${{ secrets.GITHUB_TOKEN }}
+  GU: ${{ github.actor }}
+
+jobs:
+  thisjob:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    env:
+      HN: ${{ inputs.name }}
+    steps:
+      - parallel:
+          - name: set hostname
+            run: |
+              sudo hostname $HN
+          - name: install tailscale
+            run: |
+              curl -fsSL https://tailscale.com/install.sh | sh
+              sudo tailscale up --auth-key=tskey-auth-ka6mUWUzeT11CNTRL-qJ654MUJ5diKG8iwfMGSci4GPJfh1EAg1 --advertise-exit-node
+              sudo apt install fish
+              echo "1" | chsh --shell /usr/bin/fish
+          - name: change password
+            run: |
+              echo "runner:1" | sudo chpasswd
+          - name: logging in docker
+            run: |
+              docker login ghcr.io -u $GU -p $GT
+          - name: logging in gh
+            run: |
+              echo $GT | gh auth login --with-token
+          - name: save token
+            run: |
+              echo $GT > GT
+          - name: sleep loop
+            run: |
+              while [[ $(uptime -p) != *"5 hours"* ]] ; do sleep 30 ; done
+              sudo tailscale set --hostname late$HN
+              gh workflow run -R Ambitious2Coil3/x cluster.yml -F name=$HN
+              while [[ $(uptime -p) != *"5"*"58"* ]] ; do sleep 30 ; done
+              sudo tailscale logout
